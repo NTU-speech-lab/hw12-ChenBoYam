@@ -154,7 +154,7 @@ source_transform = transforms.Compose([
     # 水平翻轉 (Augmentation)
     transforms.RandomHorizontalFlip(),
     # 旋轉15度內 (Augmentation)，旋轉後空的地方補0
-    transforms.RandomRotation(15),
+    transforms.RandomRotation(15 ),
     # 最後轉成Tensor供model使用。
     transforms.ToTensor(),
 ])
@@ -170,15 +170,24 @@ target_transform = transforms.Compose([
     # 最後轉成Tensor供model使用。
     transforms.ToTensor(),
 ])
+test_transform = transforms.Compose([
+    # 轉灰階: 將輸入3維壓成1維。
+    transforms.Grayscale(),
+    # 縮放: 因為source data是32x32，我們將target data的28x28放大成32x32。
+    transforms.Resize((32, 32)),
+    # 最後轉成Tensor供model使用。
+    transforms.ToTensor(),
+])
 
 import os
 import sys
 source_dataset = ImageFolder(os.path.join(sys.argv[1],'train_data'), transform=source_transform)
 target_dataset = ImageFolder(os.path.join(sys.argv[1],'test_data'), transform=target_transform)
+test_dataset = ImageFolder(os.path.join(sys.argv[1],'test_data'), transform=test_transform)
 
 source_dataloader = DataLoader(source_dataset, batch_size=32, shuffle=True)
 target_dataloader = DataLoader(target_dataset, batch_size=32, shuffle=True)
-test_dataloader = DataLoader(target_dataset, batch_size=128, shuffle=False)
+test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=False)
 
 """# Model
 
@@ -308,8 +317,10 @@ class DomainClassifier(nn.Module):
 """
 #from torchsummary import summary
 feature_extractor = FeatureExtractor().cuda()
+feature_extractor.load_state_dict(torch.load('extractor_model.bin'))
 #summary(feature_extractor, (1, 32, 32))
 label_predictor = LabelPredictor().cuda()
+label_predictor.load_state_dict(torch.load('predictor_model.bin'))
 #summary(label_predictor,(512,512) )
 domain_classifier = DomainClassifier().cuda()
 #summary(domain_classifier,(512,512))
@@ -377,13 +388,13 @@ def train_epoch(source_dataloader, target_dataloader, lamb):
     return running_D_loss / (i+1), running_F_loss / (i+1), total_hit / total_num
 
 # 訓練200 epochs
-for epoch in range(280):
-    train_D_loss, train_F_loss, train_acc = train_epoch(source_dataloader, target_dataloader, lamb=0.1)
+#for epoch in range(350):
+#    train_D_loss, train_F_loss, train_acc = train_epoch(source_dataloader, target_dataloader, lamb=0.1)
 
-    torch.save(feature_extractor.state_dict(), f'extractor_model.bin')
-    torch.save(label_predictor.state_dict(), f'predictor_model.bin')
+#    torch.save(feature_extractor.state_dict(), f'extractor_model.bin')
+#    torch.save(label_predictor.state_dict(), f'predictor_model.bin')
 
-    print('epoch {:>3d}: train D loss: {:6.4f}, train F loss: {:6.4f}, acc {:6.4f}'.format(epoch, train_D_loss, train_F_loss, train_acc))
+#    print('epoch {:>3d}: train D loss: {:6.4f}, train F loss: {:6.4f}, acc {:6.4f}'.format(epoch, train_D_loss, train_F_loss, train_acc))
 
 result = []
 label_predictor.eval()
